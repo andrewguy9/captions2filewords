@@ -79,7 +79,7 @@ def reduceMatrix(tag_matrix, n_components):
     return reduced_matrix, reversed_matrix, loadings
 
 def rankTagsByLoading(loadings, tags):
-    sorted_indices = [np.argsort(-np.abs(component)) for component in loadings]
+    sorted_indices = [np.argsort(-component) for component in loadings]
     
     selected_indices = []
     maximized_sum = 0.0
@@ -88,7 +88,7 @@ def rankTagsByLoading(loadings, tags):
         for idx in indices:
             if idx not in selected_indices:
                 selected_indices.append(idx)
-                maximized_sum += abs(loadings[component_index][idx])
+                maximized_sum += loadings[component_index][idx]
                 break
     tag_strs = [tags[idx] for idx in selected_indices]
     return tag_strs
@@ -96,16 +96,18 @@ def rankTagsByLoading(loadings, tags):
 def label_reduced(reduced_row, labels, threshold):
     row_labels = []
     for idx, value in enumerate(reduced_row):
-        if abs(value) >= threshold:
+        if value >= threshold:
             row_labels.append(labels[idx])
     return row_labels
 
 USAGE="""
 Usage:
-    captions2filewords <path>
+    captions2filewords [--threshold=<t>] [--num-tags=<n>] <path>
 
 Options:
-    -h --help     Show this screen.
+    -t --threshold=<t>  Required tag strength [default: 0.5].
+    -n --num-tags=<n>   Number of tags to reduce to [default: 5].
+    -h --help                    Show this screen.
 
 """
 
@@ -113,13 +115,22 @@ from docopt import docopt
 
 def main(args):
     path = args['<path>']
+    threshold = float(args['--threshold'])
+    n = int(args['--num-tags'])
     captions = create_caption_dictionary(path)
     file2tags = {file: caption2tags(caption) for file, caption in captions.items()}
     tag_matrix, tags, files = tags2tagMatrix(file2tags)
-    reduced_matrix, reversed_matrix, loadings = reduceMatrix(tag_matrix, 5)
+    reduced_matrix, reversed_matrix, loadings = reduceMatrix(tag_matrix, n)
     reduced_labels = rankTagsByLoading(loadings, tags)
     for file, row in zip(file2tags.keys(), reduced_matrix):
-        print(file, label_reduced(row, reduced_labels, .5))
+        row_labels = label_reduced(row, reduced_labels, threshold)
+        style = []
+        for row_label in row_labels:
+             if row_label in file2tags[file]:
+                 style.append(row_label.upper())
+             else:
+                 style.append(row_label)
+        print(file, style)
 
 if __name__ == '__main__':
     arguments = docopt(USAGE)
