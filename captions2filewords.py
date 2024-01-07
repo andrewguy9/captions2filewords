@@ -93,14 +93,32 @@ def label_reduced(row, actual_tags, ranked_labels, threshold):
             row_labels.add(matches[0])
     return row_labels
 
+import shutil
+
+def copy_files_to(input_dir, files_and_tags, output_dir):
+    os.makedirs(output_dir, exist_ok=True)
+    
+    total_images = len(files_and_tags)
+    zeroes_needed = len(str(total_images)) + 1
+    
+    for index, (filename, tags) in enumerate(files_and_tags.items(), start=1):
+        num = str(index).zfill(zeroes_needed)
+        tag_str = '-'.join(tags)
+        ext = os.path.splitext(filename)[1]
+        new_filename = f"{num}-{tag_str}{ext}"
+        old_path = os.path.join(input_dir, filename)
+        new_path = os.path.join(output_dir, new_filename)
+        shutil.copy(old_path, new_path)
+
 USAGE="""
 Usage:
-    captions2filewords [--threshold=<t>] [--num-tags=<n>] <path>
+    captions2filewords [--threshold=<t>] [--num-tags=<n>] [--output=<outdir>] <path>
 
 Options:
-    -t --threshold=<t>  Required tag strength [default: 0.5].
-    -n --num-tags=<n>   Number of tags to reduce to [default: 5].
-    -h --help                    Show this screen.
+    -t --threshold=<t>    Required tag strength [default: 0.5].
+    -n --num-tags=<n>     Number of tags to reduce to [default: 5].
+    -o --output=<outdir>  Where to place file copies.
+    -h --help             Show this screen.
 
 """
 
@@ -110,6 +128,7 @@ def main(args):
     path = args['<path>']
     threshold = float(args['--threshold'])
     n = int(args['--num-tags'])
+    outdir = args['--output']
     captions = create_caption_dictionary(path)
     file2tags = {file: caption2tags(caption) for file, caption in captions.items()}
     tag_matrix, tags, files = tags2tagMatrix(file2tags)
@@ -118,6 +137,8 @@ def main(args):
     for file, row in zip(file2tags.keys(), reduced_matrix):
         row_labels = label_reduced(row, file2tags[file], ranked_labels, threshold)
         print(file, row_labels)
+    if outdir is not None:
+        copy_files_to(path, file2tags, outdir)
 
 if __name__ == '__main__':
     arguments = docopt(USAGE)
