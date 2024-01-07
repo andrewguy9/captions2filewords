@@ -78,26 +78,19 @@ def reduceMatrix(tag_matrix, n_components):
 
     return reduced_matrix, reversed_matrix, loadings
 
-def rankTagsByLoading(loadings, tags):
+def loading2Tags(loadings, tags):
     sorted_indices = [np.argsort(-component) for component in loadings]
-    
-    selected_indices = []
-    maximized_sum = 0.0
-    
-    for component_index, indices in enumerate(sorted_indices):
-        for idx in indices:
-            if idx not in selected_indices:
-                selected_indices.append(idx)
-                maximized_sum += loadings[component_index][idx]
-                break
-    tag_strs = [tags[idx] for idx in selected_indices]
-    return tag_strs
+    ranked_tags = []
+    for component_index, indicies in enumerate(sorted_indices):
+        ranked_tags.append([tags[index] for index in indicies])
+    return ranked_tags
 
-def label_reduced(reduced_row, labels, threshold):
-    row_labels = []
-    for idx, value in enumerate(reduced_row):
+def label_reduced(row, actual_tags, ranked_labels, threshold):
+    row_labels = set()
+    for idx, value in enumerate(row):
         if value >= threshold:
-            row_labels.append(labels[idx])
+            matches = [tag for tag in ranked_labels[idx] if tag in actual_tags and tag not in row_labels]
+            row_labels.add(matches[0])
     return row_labels
 
 USAGE="""
@@ -121,16 +114,10 @@ def main(args):
     file2tags = {file: caption2tags(caption) for file, caption in captions.items()}
     tag_matrix, tags, files = tags2tagMatrix(file2tags)
     reduced_matrix, reversed_matrix, loadings = reduceMatrix(tag_matrix, n)
-    reduced_labels = rankTagsByLoading(loadings, tags)
+    ranked_labels = loading2Tags(loadings, tags)
     for file, row in zip(file2tags.keys(), reduced_matrix):
-        row_labels = label_reduced(row, reduced_labels, threshold)
-        style = []
-        for row_label in row_labels:
-             if row_label in file2tags[file]:
-                 style.append(row_label.upper())
-             else:
-                 style.append(row_label)
-        print(file, style)
+        row_labels = label_reduced(row, file2tags[file], ranked_labels, threshold)
+        print(file, row_labels)
 
 if __name__ == '__main__':
     arguments = docopt(USAGE)
