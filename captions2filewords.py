@@ -40,7 +40,7 @@ def create_caption_dictionary(directory):
 
 def caption2tags(caption):
     # Split the string by comma
-    tags = caption.split(',')
+    tags = reversed(caption.split(','))
 
     # Strip whitespace from each tag and filter out empty strings
     cleaned_tags = {tag.strip() for tag in tags if tag.strip()}
@@ -103,7 +103,7 @@ def copy_files_to(input_dir, files_and_tags, output_dir):
     
     for index, (filename, tags) in enumerate(files_and_tags.items(), start=1):
         num = str(index).zfill(zeroes_needed)
-        tag_str = '-'.join(tags)
+        tag_str = ','.join(tags)
         ext = os.path.splitext(filename)[1]
         new_filename = f"{num}-{tag_str}{ext}"
         old_path = os.path.join(input_dir, filename)
@@ -112,14 +112,14 @@ def copy_files_to(input_dir, files_and_tags, output_dir):
 
 USAGE="""
 Usage:
-    captions2filewords [--threshold=<t>] [--num-tags=<n>] [--output=<outdir>] <path>
+    captions2filewords [--threshold=<t>] [--num-tags=<n>] [--output=<outdir>] [--prompt=<prompt>] <path>
 
 Options:
     -t --threshold=<t>    Required tag strength [default: 0.5].
     -n --num-tags=<n>     Number of tags to reduce to [default: 5].
     -o --output=<outdir>  Where to place file copies.
+    -p --prompt=<prompt>  Default prompt to add to all images.
     -h --help             Show this screen.
-
 """
 
 from docopt import docopt
@@ -129,16 +129,19 @@ def main(args):
     threshold = float(args['--threshold'])
     n = int(args['--num-tags'])
     outdir = args['--output']
+    default_tags = caption2tags(args['--prompt'] or '')
     captions = create_caption_dictionary(path)
     file2tags = {file: caption2tags(caption) for file, caption in captions.items()}
     tag_matrix, tags, files = tags2tagMatrix(file2tags)
     reduced_matrix, reversed_matrix, loadings = reduceMatrix(tag_matrix, n)
     ranked_labels = loading2Tags(loadings, tags)
+    file2labels = {}
     for file, row in zip(file2tags.keys(), reduced_matrix):
-        row_labels = label_reduced(row, file2tags[file], ranked_labels, threshold)
-        print(file, row_labels)
+        row_labels = list(sorted(default_tags.union(label_reduced(row, file2tags[file], ranked_labels, threshold))))
+        print(file, * row_labels)
+        file2labels[file]=row_labels
     if outdir is not None:
-        copy_files_to(path, file2tags, outdir)
+        copy_files_to(path, file2labels, outdir)
 
 if __name__ == '__main__':
     arguments = docopt(USAGE)
